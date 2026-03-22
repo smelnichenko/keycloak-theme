@@ -8,9 +8,9 @@ body#keycloak-bg {
   min-height: 100vh;
 }
 
-/* Card top accent */
+/* Remove card top accent line */
 .pf-v5-c-login__main-header {
-  border-top-color: #2563eb !important;
+  border-top: none !important;
 }
 
 /* Card shadow */
