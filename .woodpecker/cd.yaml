@@ -58,7 +58,7 @@ steps:
           cd /tmp/infra
           git config user.name "Woodpecker CD"
           git config user.email "woodpecker@pmon.dev"
-          sed -i "s|tag: \".*\"  # keycloak-theme|tag: \"$GIT_HASH\"  # keycloak-theme|" "$HELMRELEASE"
+          sed -i "s|image: git.pmon.dev/schnappy/keycloak-theme:.*  # keycloak-theme|image: git.pmon.dev/schnappy/keycloak-theme:$GIT_HASH  # keycloak-theme|" "$HELMRELEASE"
           git add -A
           git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
           git commit -m "deploy: keycloak-theme=$GIT_HASH"
