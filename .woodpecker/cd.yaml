@@ -1,0 +1,74 @@
+# CD: Build Keycloak image with custom theme and deploy via Flux
+
+when:
+  - branch: main
+    event: push
+
+clone:
+  - name: git
+    image: woodpeckerci/plugin-git
+    settings:
+      partial: false
+      depth: 100
+
+steps:
+  - name: push-image
+    image: gcr.io/kaniko-project/executor:debug
+    commands:
+      - |
+        for i in $(seq 1 60); do
+          wget --no-check-certificate -q -O /dev/null -S --timeout=2 https://git.pmon.dev/v2/ 2>&1 | grep -q "HTTP/" && break
+          sleep 1
+        done
+      - mkdir -p /kaniko/.docker
+      - |
+        echo "{\"auths\":{\"git.pmon.dev\":{\"username\":\"$REGISTRY_USER\",\"password\":\"$REGISTRY_TOKEN\"}}}" > /kaniko/.docker/config.json
+      - GIT_HASH=$(echo "$CI_COMMIT_SHA" | cut -c1-7)
+      - |
+        /kaniko/executor \
+          --context=. \
+          --dockerfile=Dockerfile \
+          --destination=git.pmon.dev/schnappy/keycloak-theme:$GIT_HASH \
+          --skip-tls-verify-registry=git.pmon.dev \
+          --cache=true \
+          --cache-repo=git.pmon.dev/schnappy/keycloak-theme/cache
+    backend_options:
+      kubernetes:
+        secrets:
+          - name: woodpecker-ci-secrets
+            key: registry_user
+            target:
+              env: REGISTRY_USER
+          - name: woodpecker-ci-secrets
+            key: registry_token
+            target:
+              env: REGISTRY_TOKEN
+
+  - name: update-infra
+    image: alpine:latest
+    commands:
+      - apk add --no-cache git
+      - printf "machine git.pmon.dev\nlogin woodpecker\npassword %s\n" "$INFRA_TOKEN" > ~/.netrc && chmod 600 ~/.netrc
+      - GIT_HASH=$(echo "$CI_COMMIT_SHA" | cut -c1-7)
+      - HELMRELEASE=clusters/production/schnappy/helmrelease.yaml
+      - |
+        for attempt in 1 2 3 4 5; do
+          cd / && rm -rf /tmp/infra
+          git clone https://git.pmon.dev/schnappy/infra.git /tmp/infra
+          cd /tmp/infra
+          git config user.name "Woodpecker CD"
+          git config user.email "woodpecker@pmon.dev"
+          sed -i "s|tag: \".*\"  # keycloak-theme|tag: \"$GIT_HASH\"  # keycloak-theme|" "$HELMRELEASE"
+          git add -A
+          git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
+          git commit -m "deploy: keycloak-theme=$GIT_HASH"
+          git push && { echo "Push succeeded"; exit 0; }
+          echo "Push conflict (attempt $attempt), retrying..."
+          sleep $((attempt * 2))
+        done
+        echo "ERROR: Failed to push after 5 attempts"
+        exit 1
+    depends_on: [push-image]
+    environment:
+      INFRA_TOKEN:
+        from_secret: infra_repo_token
