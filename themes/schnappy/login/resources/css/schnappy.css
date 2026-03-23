@@ -78,8 +78,7 @@ a:hover {
   font-weight: 400 !important;
 }
 
-/* Hide "powered by Keycloak" footer */
-.pf-v5-c-login__main-footer .kc-login-tooltip,
-#kc-info-wrapper {
+/* Hide "powered by Keycloak" tooltip */
+.pf-v5-c-login__main-footer .kc-login-tooltip {
   display: none !important;
 }
