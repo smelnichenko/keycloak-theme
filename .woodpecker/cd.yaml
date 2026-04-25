@@ -1,4 +1,4 @@
-# CD: Build Keycloak image with custom theme and deploy via Flux
+# CD: Build Keycloak image with custom theme and deploy via Argo CD
 
 when:
   - branch: main
